@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight SMP</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:        #04020d;
+      --bg2:       #080514;
+      --purple:    #7c3aed;
+      --purple-lt: #a855f7;
+      --purple-glow: #9333ea;
+      --cyan:      #06b6d4;
+      --text:      #e2d9f3;
+      --muted:     #6b5f85;
+      --border:    rgba(124,58,237,0.35);
+      --card:      rgba(10,5,25,0.85);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 17px;
+      line-height: 1.6;
+      overflow-x: hidden;
+      cursor: crosshair;
+    }
+
+    /* ── Starfield ── */
+    #stars-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ── Scanline overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.04) 2px,
+        rgba(0,0,0,0.04) 4px
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Noise grain ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: -50%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.03;
+      pointer-events: none;
+      z-index: 1;
+      animation: grainMove 0.4s steps(1) infinite;
+    }
+    @keyframes grainMove {
+      0%   { transform: translate(0,0); }
+      25%  { transform: translate(-2%,-2%); }
+      50%  { transform: translate(2%,-1%); }
+      75%  { transform: translate(-1%, 2%); }
+      100% { transform: translate(0,0); }
+    }
+
+    /* ── Layout wrapper ── */
+    .site { position: relative; z-index: 2; }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 3rem;
+      height: 68px;
+      background: rgba(4,2,13,0.82);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+    .nav-logo img {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 8px var(--purple));
+    }
+    .nav-logo span {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.12em;
+      color: var(--text);
+    }
+    .nav-links {
+      display: flex;
+      gap: 2.5rem;
+      list-style: none;
+    }
+    .nav-links a {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.25s;
+      position: relative;
+    }
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      bottom: -4px; left: 0;
+      width: 0; height: 1px;
+      background: var(--purple-lt);
+      transition: width 0.3s;
+    }
+    .nav-links a:hover { color: var(--purple-lt); }
+    .nav-links a:hover::after { width: 100%; }
+
+    /* ── HERO ── */
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6rem 2rem 4rem;
+      position: relative;
+    }
+    .hero-ring {
+      position: absolute;
+      width: 520px; height: 520px;
+      border-radius: 50%;
+      border: 1px solid rgba(124,58,237,0.18);
+      animation: ringPulse 4s ease-in-out infinite;
+    }
+    .hero-ring:nth-child(2) { width: 680px; height: 680px; animation-delay: 1s; }
+    .hero-ring:nth-child(3) { width: 840px; height: 840px; animation-delay: 2s; }
+    @keyframes ringPulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50%       { opacity: 0.7; transform: scale(1.02); }
+    }
+
+    .hero-logo-wrap {
+      position: relative;
+      margin-bottom: 2rem;
+      animation: fadeUp 1s ease both;
+    }
+    .hero-logo-wrap img {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 30px var(--purple)) drop-shadow(0 0 60px rgba(124,58,237,0.4));
+      animation: logoFloat 5s ease-in-out infinite;
+    }
+    @keyframes logoFloat {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-12px); }
+    }
+
+    .hero-eyebrow {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.6rem;
+      letter-spacing: 0.35em;
+      color: var(--purple-lt);
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+      animation: fadeUp 1s 0.15s ease both;
+    }
+    h1.hero-title {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: clamp(2.8rem, 8vw, 6rem);
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 0%, var(--purple-lt) 50%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1.25rem;
+      animation: fadeUp 1s 0.3s ease both;
+    }
+    .hero-sub {
+      font-size: 1.1rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      max-width: 480px;
+      margin: 0 auto 2.5rem;
+      animation: fadeUp 1s 0.45s ease both;
+    }
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.85rem 2.2rem;
+      background: transparent;
+      border: 1px solid var(--purple);
+      color: var(--purple-lt);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      text-decoration: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.3s, border-color 0.3s;
+      animation: fadeUp 1s 0.6s ease both;
+    }
+    .hero-cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--purple);
+      transform: translateX(-105%);
+      transition: transform 0.35s cubic-bezier(.4,0,.2,1);
+    }
+    .hero-cta:hover { color: #fff; border-color: var(--purple-lt); }
+    .hero-cta:hover::before { transform: translateX(0); }
+    .hero-cta span { position: relative; z-index: 1; }
+    .hero-cta svg { position: relative; z-index: 1; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── SECTION SHARED ── */
+    section {
+      padding: 6rem 2rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .section-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.58rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--purple-lt);
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .section-label::before {
+      content: '';
+      display: inline-block;
+      width: 28px; height: 1px;
+      background: var(--purple-lt);
+    }
+    h2.section-title {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: clamp(1.7rem, 4vw, 2.6rem);
+      letter-spacing: -0.01em;
+      color: var(--text);
+      margin-bottom: 3rem;
+    }
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin: 0;
+    }
+
+    /* ── MEMBERS ── */
+    #members { }
+    .members-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1.25rem;
+    }
+    .member-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 1.5rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.85rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .member-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--purple-lt), transparent);
+      transform: scaleX(0);
+      transition: transform 0.4s;
+    }
+    .member-card:hover { border-color: var(--purple); transform: translateY(-4px); }
+    .member-card:hover::before { transform: scaleX(1); }
+    .member-avatar {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, var(--purple) 0%, #1e1040 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 1.4rem;
+      color: var(--purple-lt);
+      position: relative;
+    }
+    .member-avatar::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border: 1px solid var(--border);
+    }
+    .member-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      color: var(--text);
+    }
+    .member-role {
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+    .member-badge {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.5rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border: 1px solid;
+    }
+    .badge-owner  { border-color: #f59e0b; color: #f59e0b; }
+    .badge-admin  { border-color: var(--purple-lt); color: var(--purple-lt); }
+    .badge-mod    { border-color: var(--cyan); color: var(--cyan); }
+    .badge-member { border-color: var(--muted); color: var(--muted); }
+
+    /* ── RULES ── */
+    #rules { }
+    .rules-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .rule-item {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      align-items: start;
+      gap: 1.25rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 1.4rem 1.75rem;
+      transition: border-color 0.3s, background 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .rule-item::after {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--purple), var(--cyan));
+      transform: scaleY(0);
+      transform-origin: top;
+      transition: transform 0.35s;
+    }
+    .rule-item:hover { border-color: var(--purple); background: rgba(10,5,30,0.95); }
+    .rule-item:hover::after { transform: scaleY(1); }
+    .rule-num {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: rgba(124,58,237,0.35);
+      line-height: 1;
+      padding-top: 3px;
+    }
+    .rule-content h3 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+    .rule-content p {
+      font-size: 0.92rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ── HOW TO JOIN ── */
+    #join { }
+    .join-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+    .step-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      position: relative;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .step-card:hover { border-color: var(--purple-lt); transform: translateY(-4px); }
+    .step-num-big {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 4rem;
+      font-weight: 900;
+      color: rgba(124,58,237,0.12);
+      line-height: 1;
+      position: absolute;
+      top: 0.75rem; right: 1rem;
+      pointer-events: none;
+    }
+    .step-icon {
+      font-size: 1.6rem;
+      margin-bottom: 1rem;
+    }
+    .step-card h3 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--text);
+      margin-bottom: 0.6rem;
+    }
+    .step-card p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .join-form-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 2.5rem;
+      position: relative;
+    }
+    .join-form-wrap::before {
+      content: 'APPLICATION';
+      position: absolute;
+      top: -0.55rem; left: 2rem;
+      background: var(--bg);
+      padding: 0 0.75rem;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.55rem;
+      letter-spacing: 0.25em;
+      color: var(--purple-lt);
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .form-group.full { grid-column: 1 / -1; }
+    label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.55rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--purple-lt);
+    }
+    input, textarea, select {
+      background: rgba(124,58,237,0.06);
+      border: 1px solid rgba(124,58,237,0.3);
+      color: var(--text);
+      padding: 0.75rem 1rem;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.25s, background 0.25s;
+      width: 100%;
+    }
+    input::placeholder, textarea::placeholder { color: var(--muted); }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--purple);
+      background: rgba(124,58,237,0.1);
+    }
+    select option { background: #0a0520; }
+    textarea { resize: vertical; min-height: 110px; }
+    .submit-btn {
+      margin-top: 1.5rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.9rem 2.5rem;
+      background: var(--purple);
+      border: 1px solid var(--purple-lt);
+      color: #fff;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    .submit-btn:hover {
+      background: var(--purple-lt);
+      box-shadow: 0 0 30px rgba(124,58,237,0.5);
+    }
+
+    /* ── SHOP ── */
+    .shop-coming-soon {
+      position: relative;
+      border: 1px solid var(--border);
+      background: var(--card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 380px;
+      overflow: hidden;
+    }
+    .shop-glow-ring {
+      position: absolute;
+      width: 500px; height: 500px;
+      border-radius: 50%;
+      border: 1px solid rgba(124,58,237,0.15);
+      animation: ringPulse 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .shop-inner {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 3rem 2rem;
+      max-width: 540px;
+    }
+    .shop-icon { font-size: 3rem; margin-bottom: 1rem; filter: drop-shadow(0 0 16px var(--purple)); }
+    .shop-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      background: linear-gradient(135deg, var(--text) 0%, var(--purple-lt) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+    }
+    .shop-desc { font-size: 0.95rem; color: var(--muted); line-height: 1.6; margin-bottom: 1.75rem; }
+    .shop-badges { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; margin-bottom: 2rem; }
+    .shop-badge {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.55rem;
+      letter-spacing: 0.15em;
+      padding: 5px 14px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: rgba(124,58,237,0.06);
+    }
+    .shop-notify {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem;
+      text-align: center;
+    }
+    .footer-links {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .footer-links a {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.55rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--purple-lt); }
+    .footer-copy {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.52rem;
+      letter-spacing: 0.18em;
+      color: rgba(107,95,133,0.6);
+    }
+    .footer-copy span { color: var(--purple-lt); }
+
+    .ip-display {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      color: var(--cyan);
+      background: rgba(6,182,212,0.07);
+      border: 1px solid rgba(6,182,212,0.25);
+      padding: 0.6rem 0.9rem;
+      word-break: break-all;
+    }
+
+    /* ── SCROLL REVEAL ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="stars-canvas"></canvas>
+
+<div class="site">
+
+  <!-- NAV -->
+  <nav>
+    <a class="nav-logo" href="#hero">
+      <img src="icon.png" alt="Midnight SMP Logo" onerror="this.style.display='none'"/>
+      <span>MIDNIGHT SMP</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#rules">Rules</a></li>
+      <li><a href="#join">Join</a></li>
+      <li><a href="#shop">Shop</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <section id="hero">
+    <div class="hero-ring"></div>
+    <div class="hero-ring"></div>
+    <div class="hero-ring"></div>
+
+    <div class="hero-logo-wrap">
+      <img src="icon.png" alt="Logo" onerror="this.parentElement.style.display='none'"/>
+    </div>
+
+    <p class="hero-eyebrow">Survival &nbsp;·&nbsp; PvP &nbsp;·&nbsp; Java &amp; Bedrock &nbsp;·&nbsp; Open to All</p>
+    <h1 class="hero-title">MIDNIGHT<br/>SMP</h1>
+    <p class="hero-sub">Survive. Grind. Dominate. Inspired by Donut SMP — build alliances or destroy them.</p>
+    <a href="#join" class="hero-cta">
+      <span>Connect Now</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- FEATURES -->
+  <section id="features" class="reveal">
+    <p class="section-label">What We Offer</p>
+    <h2 class="section-title">Features</h2>
+    <div class="members-grid">
+
+      <div class="member-card" style="align-items:flex-start; gap:0.6rem;">
+        <div style="font-size:1.8rem">⚔️</div>
+        <span class="member-name" style="text-align:left">PvP Arena</span>
+        <span class="member-role" style="text-align:left">Dedicated PvP zone — test your skills against anyone, anytime.</span>
+      </div>
+
+      <div class="member-card" style="align-items:flex-start; gap:0.6rem;">
+        <div style="font-size:1.8rem">💰</div>
+        <span class="member-name" style="text-align:left">Player Economy</span>
+        <span class="member-role" style="text-align:left">Buy, sell, and trade. Grind your way to the top of the market.</span>
+      </div>
+
+      <div class="member-card" style="align-items:flex-start; gap:0.6rem;">
+        <div style="font-size:1.8rem">🏯</div>
+        <span class="member-name" style="text-align:left">Raiding & Defense</span>
+        <span class="member-role" style="text-align:left">Build your base, fortify it, and raid your enemies.</span>
+      </div>
+
+      <div class="member-card" style="align-items:flex-start; gap:0.6rem;">
+        <div style="font-size:1.8rem">🔄</div>
+        <span class="member-name" style="text-align:left">Multi-Version</span>
+        <span class="member-role" style="text-align:left">ViaVersion + ViaBackwards — join from nearly any Minecraft version.</span>
+      </div>
+
+      <div class="member-card" style="align-items:flex-start; gap:0.6rem;">
+        <div style="font-size:1.8rem">😈</div>
+        <span class="member-name" style="text-align:left">Alliances & Betrayal</span>
+        <span class="member-role" style="text-align:left">Team up with friends — or stab them in the back. The choice is yours.</span>
+      </div>
+
+      <div class="member-card" style="align-items:flex-start; gap:0.6rem;">
+        <div style="font-size:1.8rem">🎮</div>
+        <span class="member-name" style="text-align:left">Other Fun Stuff</span>
+        <span class="member-role" style="text-align:left">Minigames, events, and surprises rolling out regularly.</span>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- RULES -->
+  <section id="rules" class="reveal">
+    <p class="section-label">Code of Conduct</p>
+    <h2 class="section-title">Server Rules</h2>
+    <div class="rules-list">
+
+      <div class="rule-item">
+        <span class="rule-num">01</span>
+        <div class="rule-content">
+          <h3>🤝 Respect All Players</h3>
+          <p>Harassment, bullying, toxic behavior, or disrespect toward others is not permitted — even if they play on Bedrock.</p>
+        </div>
+      </div>
+
+      <div class="rule-item">
+        <span class="rule-num">02</span>
+        <div class="rule-content">
+          <h3>🚫 No Hate Speech or Discrimination</h3>
+          <p>Racism, sexism, or discriminatory language toward any individual or group is strictly prohibited.</p>
+        </div>
+      </div>
+
+      <div class="rule-item">
+        <span class="rule-num">03</span>
+        <div class="rule-content">
+          <h3>⚖️ No Drama or Disruptive Behavior</h3>
+          <p>Arguments, instigation, or unnecessary conflict may result in moderation action.</p>
+        </div>
+      </div>
+
+      <div class="rule-item">
+        <span class="rule-num">04</span>
+        <div class="rule-content">
+          <h3>🔞 No NSFW or Spam</h3>
+          <p>Posting NSFW content or excessive spam is not allowed in any channel or in-game.</p>
+        </div>
+      </div>
+
+      <div class="rule-item">
+        <span class="rule-num">05</span>
+        <div class="rule-content">
+          <h3>🛑 No Cheats, Exploits, or Hacks</h3>
+          <p>Cheat clients, advantage-giving mods, and item/entry duplication exploits are banned. Violations result in an immediate ban. Exceptions may apply to devs or owners fixing bugs.</p>
+        </div>
+      </div>
+
+      <div class="rule-item">
+        <span class="rule-num">06</span>
+        <div class="rule-content">
+          <h3>🎭 No Impersonation</h3>
+          <p>Impersonating staff, developers, or other members is prohibited.</p>
+        </div>
+      </div>
+
+      <div class="rule-item">
+        <span class="rule-num">07</span>
+        <div class="rule-content">
+          <h3>🤖 Do Not Abuse Server Systems</h3>
+          <p>Attempting to exploit server features or mechanics will result in a ban.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Enforcement -->
+    <div class="rule-item" style="margin-top:1.5rem; border-color: rgba(245,158,11,0.4); background: rgba(20,10,5,0.9);">
+      <span class="rule-num" style="color:rgba(245,158,11,0.4);">⚠️</span>
+      <div class="rule-content">
+        <h3 style="color:#f59e0b;">Enforcement Policy</h3>
+        <p>6–7 warnings may result in a temporary suspension (6–7 days) or permanent removal. Severe violations may result in immediate action without prior warnings. Staff decisions are final.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- HOW TO JOIN -->
+  <section id="join" class="reveal">
+    <p class="section-label">Connect Today</p>
+    <h2 class="section-title">How to Join</h2>
+
+    <div class="join-steps" style="margin-bottom:3rem;">
+      <div class="step-card">
+        <span class="step-num-big">1</span>
+        <div class="step-icon">🎮</div>
+        <h3>Launch Minecraft</h3>
+        <p>Open Minecraft Java or Bedrock Edition. Any recent version works thanks to ViaVersion support.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num-big">2</span>
+        <div class="step-icon">🖥️</div>
+        <h3>Add the Server</h3>
+        <p>Copy the IP below for your edition and add it as a new server in your multiplayer menu.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num-big">3</span>
+        <div class="step-icon">⚔️</div>
+        <h3>Start Grinding</h3>
+        <p>Jump in, find your footing, and start building your legacy on the Midnight SMP.</p>
+      </div>
+    </div>
+
+    <!-- Connection Cards -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:1.25rem; margin-bottom:1.25rem;">
+
+      <div class="join-form-wrap" style="padding:2rem;">
+        <div style="font-size:1.4rem; margin-bottom:0.75rem;">☕ Java Edition</div>
+        <div class="section-label" style="margin-bottom:0.4rem;">IP Address</div>
+        <div class="ip-display" id="java-ip">play.midnightsmp.xyz</div>
+        <button class="submit-btn" style="margin-top:1rem; width:100%; justify-content:center;" onclick="copyIP('java-ip', this)">
+          <span>Copy IP</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+
+      <div class="join-form-wrap" style="padding:2rem;">
+        <div style="font-size:1.4rem; margin-bottom:0.75rem;">🪨 Bedrock Edition</div>
+        <div class="section-label" style="margin-bottom:0.4rem;">IP Address</div>
+        <div class="ip-display" id="bedrock-ip">bedrock.midnightsmp.xyz</div>
+        <div class="section-label" style="margin:0.75rem 0 0.4rem;">Port</div>
+        <div class="ip-display" id="bedrock-port">25536</div>
+        <button class="submit-btn" style="margin-top:1rem; width:100%; justify-content:center;" onclick="copyIP('bedrock-ip', this)">
+          <span>Copy IP</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+
+      <div class="join-form-wrap" style="padding:2rem; display:flex; flex-direction:column; gap:1rem;">
+        <div style="font-size:1.4rem;">💬 Community</div>
+        <div>
+          <div class="section-label" style="margin-bottom:0.4rem;">Discord</div>
+          <div class="ip-display">dsc.gg/midnightdiscord</div>
+        </div>
+        <div>
+          <div class="section-label" style="margin-bottom:0.4rem;">Website</div>
+          <div class="ip-display">www.midnightsmp.xyz</div>
+        </div>
+        <a href="https://dsc.gg/midnightdiscord" target="_blank" class="submit-btn" style="margin-top:auto; justify-content:center; text-decoration:none; text-align:center;">
+          <span>Join Discord</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- SHOP -->
+  <section id="shop" class="reveal">
+    <p class="section-label">Server Store</p>
+    <h2 class="section-title">Shop</h2>
+
+    <div class="shop-coming-soon">
+      <div class="shop-glow-ring"></div>
+      <div class="shop-inner">
+        <div class="shop-icon">🛒</div>
+        <h3 class="shop-title">COMING SOON</h3>
+        <p class="shop-desc">The Midnight SMP store is currently under construction. Ranks, cosmetics, and exclusive perks will be available here soon.</p>
+        <div class="shop-badges">
+          <span class="shop-badge">👑 Ranks</span>
+          <span class="shop-badge">✨ Cosmetics</span>
+          <span class="shop-badge">⚡ Boosters</span>
+          <span class="shop-badge">🎁 Bundles</span>
+        </div>
+        <div class="shop-notify">
+          <span>Stay tuned — join the Discord for launch updates</span>
+          <a href="https://dsc.gg/midnightdiscord" target="_blank" class="submit-btn" style="margin-top:0; padding: 0.6rem 1.4rem; text-decoration:none;">
+            <span>Get Notified</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-links">
+      <a href="#features">Features</a>
+      <a href="#rules">Rules</a>
+      <a href="#join">Join</a>
+      <a href="#shop">Shop</a>
+      <a href="https://dsc.gg/midnightdiscord" target="_blank">Discord</a>
+    </div>
+    <div class="footer-copy">
+      <span>MIDNIGHT SMP</span> &nbsp;·&nbsp; play.midnightsmp.xyz &nbsp;·&nbsp; All rights reserved
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  /* ── Starfield ── */
+  const canvas = document.getElementById('stars-canvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  function initStars() {
+    stars = [];
+    const count = Math.floor((canvas.width * canvas.height) / 3500);
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        r: Math.random() * 1.3 + 0.2,
+        alpha: Math.random(),
+        speed: Math.random() * 0.003 + 0.001,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  let raf;
+  function drawStars(t) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const s of stars) {
+      const a = 0.3 + 0.7 * Math.abs(Math.sin(s.phase + t * s.speed));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,180,255,${a})`;
+      ctx.fill();
+    }
+    raf = requestAnimationFrame(drawStars);
+  }
+
+  resize(); initStars(); drawStars(0);
+  window.addEventListener('resize', () => { resize(); initStars(); });
+
+  /* ── Scroll reveal ── */
+  const revealEls = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  revealEls.forEach(el => io.observe(el));
+
+  /* ── Copy IP ── */
+  function copyIP(id, btn) {
+    const text = document.getElementById(id).textContent.trim();
+    navigator.clipboard.writeText(text).then(() => {
+      const original = btn.querySelector('span').textContent;
+      btn.querySelector('span').textContent = 'Copied!';
+      btn.style.background = '#059669';
+      setTimeout(() => {
+        btn.querySelector('span').textContent = original;
+        btn.style.background = '';
+      }, 2000);
+    });
+  }
+</script>
+</body>
+</html>
